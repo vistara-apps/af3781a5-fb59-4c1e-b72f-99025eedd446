@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, Globe, MapPin, Loader2 } from 'lucide-react';
+import { ChevronDown, Globe, MapPin, Loader2, AlertCircle, Copy, Check } from 'lucide-react';
 import { US_STATES, SCENARIOS } from '@/lib/constants';
-import { generateScript } from '@/lib/openai';
 import { GeneratedScript } from '@/lib/types';
+import { copyToClipboard } from '@/lib/utils';
 
 interface ScriptGeneratorProps {
   variant?: 'languageSwitch' | 'stateSelect';
@@ -18,20 +18,47 @@ export function ScriptGenerator({ variant = 'stateSelect' }: ScriptGeneratorProp
   const [generatedScript, setGeneratedScript] = useState<GeneratedScript | null>(null);
   const [showStateDropdown, setShowStateDropdown] = useState(false);
   const [showScenarioDropdown, setShowScenarioDropdown] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [copiedSection, setCopiedSection] = useState<string | null>(null);
 
   const handleGenerateScript = async () => {
     setIsGenerating(true);
+    setError(null);
+    
     try {
-      const script = await generateScript({
-        scenario: selectedScenario,
-        state: selectedState,
-        language: selectedLanguage
+      const response = await fetch('/api/scripts/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          scenario: selectedScenario,
+          state: selectedState,
+          language: selectedLanguage
+        }),
       });
-      setGeneratedScript(script);
+
+      if (!response.ok) {
+        throw new Error('Failed to generate script');
+      }
+
+      const data = await response.json();
+      setGeneratedScript(data.data);
     } catch (error) {
       console.error('Error generating script:', error);
+      setError(error instanceof Error ? error.message : 'Failed to generate script');
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleCopySection = async (sectionName: string, content: string[]) => {
+    const text = content.join('\n');
+    const success = await copyToClipboard(text);
+    
+    if (success) {
+      setCopiedSection(sectionName);
+      setTimeout(() => setCopiedSection(null), 2000);
     }
   };
 
@@ -144,11 +171,39 @@ export function ScriptGenerator({ variant = 'stateSelect' }: ScriptGeneratorProp
         </button>
       </div>
 
+      {/* Error Display */}
+      {error && (
+        <div className="glass-card p-4 rounded-lg border-red-500 border-opacity-50">
+          <div className="flex items-center space-x-2 text-red-400">
+            <AlertCircle className="h-5 w-5" />
+            <span className="text-sm">{error}</span>
+          </div>
+        </div>
+      )}
+
       {/* Generated Script Display */}
       {generatedScript && (
         <div className="space-y-4">
           <div className="glass-card p-6 rounded-lg">
-            <h3 className="text-lg font-semibold mb-4 text-accent">✓ What TO Say</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-accent">✓ What TO Say</h3>
+              <button
+                onClick={() => handleCopySection('whatToSay', generatedScript.whatToSay)}
+                className="flex items-center space-x-1 text-sm text-gray-400 hover:text-white transition-colors duration-200"
+              >
+                {copiedSection === 'whatToSay' ? (
+                  <>
+                    <Check className="h-4 w-4" />
+                    <span>Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4" />
+                    <span>Copy</span>
+                  </>
+                )}
+              </button>
+            </div>
             <ul className="space-y-2">
               {generatedScript.whatToSay.map((item, index) => (
                 <li key={index} className="flex items-start space-x-2">
@@ -160,7 +215,25 @@ export function ScriptGenerator({ variant = 'stateSelect' }: ScriptGeneratorProp
           </div>
 
           <div className="glass-card p-6 rounded-lg">
-            <h3 className="text-lg font-semibold mb-4 text-red-400">✗ What NOT to Say</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-red-400">✗ What NOT to Say</h3>
+              <button
+                onClick={() => handleCopySection('whatNotToSay', generatedScript.whatNotToSay)}
+                className="flex items-center space-x-1 text-sm text-gray-400 hover:text-white transition-colors duration-200"
+              >
+                {copiedSection === 'whatNotToSay' ? (
+                  <>
+                    <Check className="h-4 w-4" />
+                    <span>Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4" />
+                    <span>Copy</span>
+                  </>
+                )}
+              </button>
+            </div>
             <ul className="space-y-2">
               {generatedScript.whatNotToSay.map((item, index) => (
                 <li key={index} className="flex items-start space-x-2">
@@ -172,7 +245,25 @@ export function ScriptGenerator({ variant = 'stateSelect' }: ScriptGeneratorProp
           </div>
 
           <div className="glass-card p-6 rounded-lg">
-            <h3 className="text-lg font-semibold mb-4 text-blue-400">🛡️ Your Key Rights</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-blue-400">🛡️ Your Key Rights</h3>
+              <button
+                onClick={() => handleCopySection('keyRights', generatedScript.keyRights)}
+                className="flex items-center space-x-1 text-sm text-gray-400 hover:text-white transition-colors duration-200"
+              >
+                {copiedSection === 'keyRights' ? (
+                  <>
+                    <Check className="h-4 w-4" />
+                    <span>Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4" />
+                    <span>Copy</span>
+                  </>
+                )}
+              </button>
+            </div>
             <ul className="space-y-2">
               {generatedScript.keyRights.map((item, index) => (
                 <li key={index} className="flex items-start space-x-2">
@@ -184,7 +275,25 @@ export function ScriptGenerator({ variant = 'stateSelect' }: ScriptGeneratorProp
           </div>
 
           <div className="glass-card p-6 rounded-lg">
-            <h3 className="text-lg font-semibold mb-4 text-yellow-400">💡 Additional Tips</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-yellow-400">💡 Additional Tips</h3>
+              <button
+                onClick={() => handleCopySection('additionalTips', generatedScript.additionalTips)}
+                className="flex items-center space-x-1 text-sm text-gray-400 hover:text-white transition-colors duration-200"
+              >
+                {copiedSection === 'additionalTips' ? (
+                  <>
+                    <Check className="h-4 w-4" />
+                    <span>Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4" />
+                    <span>Copy</span>
+                  </>
+                )}
+              </button>
+            </div>
             <ul className="space-y-2">
               {generatedScript.additionalTips.map((item, index) => (
                 <li key={index} className="flex items-start space-x-2">

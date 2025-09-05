@@ -1,135 +1,130 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { Mic, MicOff, Square, Play, Pause } from 'lucide-react';
+import { AlertCircle, Download, Mic, Pause, Play, Save, Square, Trash2 } from 'lucide-react';
+import { useRecording } from '@/lib/hooks/useRecording';
+import { useState } from 'react';
 
 interface RecordButtonProps {
   variant?: 'active' | 'inactive';
 }
 
 export function RecordButton({ variant = 'inactive' }: RecordButtonProps) {
-  const [isRecording, setIsRecording] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
-  const [hasRecording, setHasRecording] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const {
+    isRecording,
+    isPaused,
+    audioUrl,
+    error,
+    formattedDuration,
+    formattedFileSize,
+    isSupported,
+    startRecording,
+    stopRecording,
+    pauseRecording,
+    resumeRecording,
+    clearRecording,
+    downloadRecording,
+    saveRecording
+  } = useRecording();
 
-  const startRecording = async () => {
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const handleSaveRecording = async () => {
+    setSaving(true);
+    setSaveSuccess(false);
+    
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: true, 
-        video: false 
-      });
-      
-      streamRef.current = stream;
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-
-      const chunks: BlobPart[] = [];
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          chunks.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'audio/webm' });
-        // Here you would typically save or upload the recording
-        console.log('Recording saved:', blob);
-        setHasRecording(true);
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-      setRecordingTime(0);
-
-      // Start timer
-      intervalRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
-      }, 1000);
-
-    } catch (error) {
-      console.error('Error starting recording:', error);
-      alert('Unable to access microphone. Please check permissions.');
+      // In a real app, you'd get the actual user ID
+      const userId = 'demo-user-' + Date.now();
+      await saveRecording(userId);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err) {
+      console.error('Failed to save recording:', err);
+    } finally {
+      setSaving(false);
     }
   };
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      streamRef.current?.getTracks().forEach(track => track.stop());
-      setIsRecording(false);
-      setIsPaused(false);
-      
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    }
-  };
-
-  const pauseRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      if (isPaused) {
-        mediaRecorderRef.current.resume();
-        intervalRef.current = setInterval(() => {
-          setRecordingTime(prev => prev + 1);
-        }, 1000);
-      } else {
-        mediaRecorderRef.current.pause();
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-        }
-      }
-      setIsPaused(!isPaused);
-    }
-  };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
+  if (!isSupported) {
+    return (
+      <div className="glass-card p-6 rounded-lg text-center">
+        <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
+        <h3 className="text-lg font-semibold mb-2">Recording Not Supported</h3>
+        <p className="text-gray-300">
+          Your browser doesn't support audio recording. Please use a modern browser like Chrome, Firefox, or Safari.
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="glass-card p-6 rounded-lg">
-      <div className="text-center space-y-4">
-        <h3 className="text-lg font-semibold">Quick Record</h3>
-        <p className="text-gray-300 text-sm">
-          Tap to start recording your interaction for documentation
-        </p>
-
-        {/* Recording Status */}
-        {isRecording && (
-          <div className="flex items-center justify-center space-x-2">
-            <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-            <span className="text-red-400 font-mono">{formatTime(recordingTime)}</span>
-            {isPaused && <span className="text-yellow-400 text-sm">(Paused)</span>}
+    <div className="space-y-6">
+      {/* Error Display */}
+      {error && (
+        <div className="glass-card p-4 rounded-lg border-red-500 border-opacity-50">
+          <div className="flex items-center space-x-2 text-red-400">
+            <AlertCircle className="h-5 w-5" />
+            <span className="text-sm">{error}</span>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Control Buttons */}
-        <div className="flex items-center justify-center space-x-4">
-          {!isRecording ? (
+      {/* Success Message */}
+      {saveSuccess && (
+        <div className="glass-card p-4 rounded-lg border-green-500 border-opacity-50">
+          <div className="flex items-center space-x-2 text-green-400">
+            <Save className="h-5 w-5" />
+            <span className="text-sm">Recording saved successfully!</span>
+          </div>
+        </div>
+      )}
+
+      {/* Recording Controls */}
+      <div className="glass-card p-6 rounded-lg text-center">
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-2">Quick Record</h3>
+          <p className="text-gray-300 text-sm mb-4">
+            Tap to start recording your interaction for documentation
+          </p>
+          
+          <div className="text-4xl font-mono text-white mb-2">
+            {formattedDuration}
+          </div>
+          <div className="text-sm text-gray-300 space-y-1">
+            <div>
+              {isRecording ? (isPaused ? 'Paused' : 'Recording...') : 'Ready to record'}
+            </div>
+            {formattedFileSize && (
+              <div className="text-xs text-gray-400">
+                File size: {formattedFileSize}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-center space-x-4 mb-6">
+          {!isRecording && !audioUrl && (
             <button
               onClick={startRecording}
-              className="w-16 h-16 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-110"
+              className="w-16 h-16 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 shadow-lg"
             >
               <Mic className="h-8 w-8 text-white" />
             </button>
-          ) : (
+          )}
+
+          {isRecording && (
             <>
               <button
-                onClick={pauseRecording}
-                className="w-12 h-12 bg-yellow-500 hover:bg-yellow-600 rounded-full flex items-center justify-center transition-all duration-200"
+                onClick={isPaused ? resumeRecording : pauseRecording}
+                className="w-12 h-12 bg-yellow-500 hover:bg-yellow-600 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 shadow-lg"
               >
                 {isPaused ? <Play className="h-6 w-6 text-white" /> : <Pause className="h-6 w-6 text-white" />}
               </button>
               
               <button
                 onClick={stopRecording}
-                className="w-16 h-16 bg-gray-600 hover:bg-gray-700 rounded-full flex items-center justify-center transition-all duration-200"
+                className="w-16 h-16 bg-gray-600 hover:bg-gray-700 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-105 shadow-lg"
               >
                 <Square className="h-8 w-8 text-white" />
               </button>
@@ -137,18 +132,89 @@ export function RecordButton({ variant = 'inactive' }: RecordButtonProps) {
           )}
         </div>
 
-        {/* Recording Status Text */}
-        <div className="text-sm text-gray-400">
-          {!isRecording && !hasRecording && "Ready to record"}
-          {isRecording && !isPaused && "Recording in progress..."}
-          {isRecording && isPaused && "Recording paused"}
-          {!isRecording && hasRecording && "Recording saved"}
-        </div>
+        {/* Playback and Actions */}
+        {audioUrl && (
+          <div className="space-y-4">
+            <div className="bg-black bg-opacity-20 rounded-lg p-4">
+              <audio controls className="w-full">
+                <source src={audioUrl} type="audio/webm" />
+                Your browser does not support audio playback.
+              </audio>
+            </div>
+            
+            <div className="flex flex-wrap justify-center gap-3">
+              <button
+                onClick={downloadRecording}
+                className="btn-secondary flex items-center space-x-2"
+              >
+                <Download className="h-4 w-4" />
+                <span>Download</span>
+              </button>
+              
+              <button
+                onClick={handleSaveRecording}
+                disabled={saving}
+                className="btn-primary flex items-center space-x-2 disabled:opacity-50"
+              >
+                <Save className="h-4 w-4" />
+                <span>{saving ? 'Saving...' : 'Save'}</span>
+              </button>
+              
+              <button
+                onClick={clearRecording}
+                className="btn-secondary flex items-center space-x-2 text-red-400 hover:text-red-300"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span>Clear</span>
+              </button>
+              
+              <button
+                onClick={startRecording}
+                className="btn-secondary flex items-center space-x-2"
+              >
+                <Mic className="h-4 w-4" />
+                <span>Record Again</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
-        {/* Legal Notice */}
-        <div className="text-xs text-gray-500 bg-gray-800 bg-opacity-50 p-3 rounded-lg">
-          <p className="mb-1">⚖️ <strong>Legal Notice:</strong></p>
-          <p>Recording laws vary by state. In some states, all parties must consent to recording. Use responsibly and know your local laws.</p>
+      {/* Instructions */}
+      <div className="glass-card p-4 rounded-lg">
+        <h3 className="font-semibold mb-3 flex items-center">
+          <AlertCircle className="h-5 w-5 mr-2 text-yellow-400" />
+          Recording Guidelines
+        </h3>
+        <ul className="text-sm text-gray-300 space-y-2">
+          <li className="flex items-start">
+            <span className="text-accent mr-2">•</span>
+            <span>Hold your device steady and speak clearly</span>
+          </li>
+          <li className="flex items-start">
+            <span className="text-accent mr-2">•</span>
+            <span>Record from a safe distance during interactions</span>
+          </li>
+          <li className="flex items-start">
+            <span className="text-accent mr-2">•</span>
+            <span>Know your local laws about recording police</span>
+          </li>
+          <li className="flex items-start">
+            <span className="text-accent mr-2">•</span>
+            <span>Keep recordings secure and share responsibly</span>
+          </li>
+          <li className="flex items-start">
+            <span className="text-accent mr-2">•</span>
+            <span>Inform others you are recording when legally required</span>
+          </li>
+        </ul>
+      </div>
+
+      {/* Legal Notice */}
+      <div className="glass-card p-4 rounded-lg border-yellow-500 border-opacity-30">
+        <div className="text-xs text-gray-400 text-center">
+          <strong className="text-yellow-400">Legal Notice:</strong> Recording laws vary by location. 
+          Some states require consent from all parties. Research your local laws before recording.
         </div>
       </div>
     </div>
