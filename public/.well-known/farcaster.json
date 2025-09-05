@@ -1,0 +1,30 @@
+{
+  "accountAssociation": {
+    "header": "",
+    "payload": "",
+    "signature": ""
+  },
+  "frame": {
+    "version": "1",
+    "name": "RightRoute",
+    "subtitle": "Built with Zara",
+    "description": "RightRoute is a Base Mini App built with Zara.",
+    "iconUrl": "https://0co.to/images/zara-2.png",
+    "homeUrl": "https://af3781a5fb594c1eb72f99025eedd446-8ba1.vercel.app",
+    "splashImageUrl": "https://af3781a5fb594c1eb72f99025eedd446-8ba1.vercel.app/splash.png",
+    "splashBackgroundColor": "#000000",
+    "heroImageUrl": "https://af3781a5fb594c1eb72f99025eedd446-8ba1.vercel.app/image.png",
+    "tagline": "RightRoute",
+    "screenshotUrls": [
+      "https://af3781a5fb594c1eb72f99025eedd446-8ba1.vercel.app/screenshot.png",
+      "https://af3781a5fb594c1eb72f99025eedd446-8ba1.vercel.app/screenshot.png"
+    ],
+    "primaryCategory": "social",
+    "tags": [
+      "base",
+      "miniapp",
+      "onchainkit"
+    ],
+    "webhookUrl": "https://af3781a5fb594c1eb72f99025eedd446-8ba1.vercel.app/api/webhook"
+  }
+}
