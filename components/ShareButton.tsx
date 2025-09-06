@@ -77,18 +77,18 @@ export function ShareButton({
   const handleNativeShare = async () => {
     const shareUrl = typeof window !== 'undefined' ? window.location.href : '';
     
-    if (navigator.share) {
-      try {
-        await shareContent({
-          title,
-          text: content,
-          url: shareUrl
-        });
-      } catch (error) {
-        console.error('Error sharing:', error);
+    try {
+      const success = await shareContent({
+        title,
+        text: content,
+        url: shareUrl
+      });
+      
+      if (!success) {
         setShowShareMenu(true);
       }
-    } else {
+    } catch (error) {
+      console.error('Error sharing:', error);
       setShowShareMenu(true);
     }
   };

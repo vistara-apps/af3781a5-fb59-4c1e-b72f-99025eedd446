@@ -55,7 +55,7 @@ export function throttle<T extends (...args: any[]) => any>(
 }
 
 export function copyToClipboard(text: string): Promise<boolean> {
-  if (navigator.clipboard && window.isSecureContext) {
+  if (typeof navigator !== 'undefined' && navigator.clipboard && typeof window !== 'undefined' && window.isSecureContext) {
     return navigator.clipboard.writeText(text).then(() => true).catch(() => false);
   } else {
     // Fallback for older browsers
@@ -81,7 +81,7 @@ export function copyToClipboard(text: string): Promise<boolean> {
 
 export function getLocationFromBrowser(): Promise<{ state: string; country: string } | null> {
   return new Promise((resolve) => {
-    if (!navigator.geolocation) {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
       resolve(null);
       return;
     }
@@ -111,7 +111,7 @@ export function shareContent(data: {
   text: string;
   url?: string;
 }): Promise<boolean> {
-  if (navigator.share) {
+  if (typeof navigator !== 'undefined' && navigator.share) {
     return navigator.share(data).then(() => true).catch(() => false);
   } else {
     // Fallback: copy to clipboard
@@ -149,6 +149,7 @@ export function formatFileSize(bytes: number): string {
 
 export function isMediaRecordingSupported(): boolean {
   return typeof MediaRecorder !== 'undefined' && 
+         typeof navigator !== 'undefined' &&
          typeof navigator.mediaDevices !== 'undefined' &&
          typeof navigator.mediaDevices.getUserMedia !== 'undefined';
 }
