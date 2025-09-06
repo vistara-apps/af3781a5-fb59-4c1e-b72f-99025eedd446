@@ -1,15 +1,49 @@
 import OpenAI from 'openai';
 import { ScriptRequest, GeneratedScript } from './types';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || process.env.OPENROUTER_API_KEY,
-  baseURL: "https://openrouter.ai/api/v1",
-  dangerouslyAllowBrowser: true,
-});
+function getOpenAIClient(): OpenAI | null {
+  const apiKey = process.env.OPENAI_API_KEY || process.env.OPENROUTER_API_KEY;
+  
+  if (!apiKey) {
+    return null;
+  }
+
+  return new OpenAI({
+    apiKey,
+    baseURL: process.env.OPENAI_BASE_URL || "https://openrouter.ai/api/v1",
+    dangerouslyAllowBrowser: true,
+  });
+}
 
 export async function generateScript(request: ScriptRequest): Promise<GeneratedScript> {
   try {
-    const prompt = `Generate a legal rights script for a ${request.scenario} in ${request.state} in ${request.language === 'es' ? 'Spanish' : 'English'}.
+    const openai = getOpenAIClient();
+    
+    // If no OpenAI client available, return fallback immediately
+    if (!openai) {
+      console.warn('No OpenAI API key configured, using fallback script');
+      return getFallbackScript(request);
+    }
+
+    const isSpanish = request.language === 'es';
+    
+    const systemPrompt = isSpanish 
+      ? 'Eres un experto en derechos legales que proporciona consejos claros, precisos y prácticos para interacciones civiles con la policía. Siempre prioriza la seguridad y el cumplimiento legal.'
+      : 'You are a legal rights expert who provides clear, accurate, and practical advice for civilian-police interactions. Always prioritize safety and legal compliance.';
+
+    const userPrompt = isSpanish 
+      ? `Genera un guión de derechos legales para un ${request.scenario} en ${request.state} en español.
+
+    Proporciona:
+    1. Qué DECIR (3-5 frases claras y respetuosas)
+    2. Qué NO decir (3-5 cosas que evitar)
+    3. Derechos clave a recordar (3-4 derechos importantes)
+    4. Consejos adicionales (2-3 consejos prácticos)
+
+    Mantén el lenguaje simple, respetuoso y legalmente preciso. Enfócate en la desescalada y protección de derechos.
+
+    Formatea como JSON con las claves: whatToSay, whatNotToSay, keyRights, additionalTips (todos arrays de strings).`
+      : `Generate a legal rights script for a ${request.scenario} in ${request.state} in English.
 
     Provide:
     1. What TO say (3-5 clear, respectful phrases)
@@ -26,15 +60,15 @@ export async function generateScript(request: ScriptRequest): Promise<GeneratedS
       messages: [
         {
           role: 'system',
-          content: 'You are a legal rights expert who provides clear, accurate, and practical advice for civilian-police interactions. Always prioritize safety and legal compliance.'
+          content: systemPrompt
         },
         {
           role: 'user',
-          content: prompt
+          content: userPrompt
         }
       ],
       temperature: 0.3,
-      max_tokens: 1000,
+      max_tokens: 1500,
     });
 
     const content = completion.choices[0]?.message?.content;
@@ -42,36 +76,87 @@ export async function generateScript(request: ScriptRequest): Promise<GeneratedS
       throw new Error('No content generated');
     }
 
-    // Parse JSON response
-    const parsed = JSON.parse(content);
-    return parsed as GeneratedScript;
+    // Clean and parse JSON response
+    let cleanContent = content.trim();
+    if (cleanContent.startsWith('```json')) {
+      cleanContent = cleanContent.replace(/```json\n?/, '').replace(/\n?```$/, '');
+    }
+
+    let parsed: GeneratedScript;
+    try {
+      parsed = JSON.parse(cleanContent);
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', cleanContent);
+      throw new Error('Invalid JSON response from AI');
+    }
+
+    // Validate response structure
+    if (!parsed.whatToSay || !parsed.whatNotToSay || !parsed.keyRights || !parsed.additionalTips) {
+      throw new Error('Incomplete response structure');
+    }
+
+    return parsed;
   } catch (error) {
     console.error('Error generating script:', error);
-    // Return fallback script
+    // Return fallback script based on language
+    return getFallbackScript(request);
+  }
+}
+
+function getFallbackScript(request: ScriptRequest): GeneratedScript {
+  const isSpanish = request.language === 'es';
+  
+  if (isSpanish) {
     return {
       whatToSay: [
-        "I am exercising my right to remain silent.",
-        "Am I free to go?",
-        "I do not consent to any searches.",
-        "I would like to speak with a lawyer."
+        "Estoy ejerciendo mi derecho a permanecer en silencio.",
+        "¿Soy libre de irme?",
+        "No consiento a ningún registro.",
+        "Me gustaría hablar con un abogado."
       ],
       whatNotToSay: [
-        "Don't argue or become confrontational",
-        "Don't lie or provide false information",
-        "Don't resist physically",
-        "Don't consent to searches"
+        "No discutas o te vuelvas confrontativo",
+        "No mientas o proporciones información falsa",
+        "No resistas físicamente",
+        "No consientas a registros"
       ],
       keyRights: [
-        "Right to remain silent",
-        "Right to refuse searches without a warrant",
-        "Right to ask if you're being detained",
-        "Right to legal representation"
+        "Derecho a permanecer en silencio",
+        "Derecho a rechazar registros sin orden judicial",
+        "Derecho a preguntar si estás siendo detenido",
+        "Derecho a representación legal"
       ],
       additionalTips: [
-        "Keep your hands visible at all times",
-        "Stay calm and speak respectfully",
-        "Remember details for later documentation"
+        "Mantén las manos visibles en todo momento",
+        "Mantén la calma y habla respetuosamente",
+        "Recuerda detalles para documentación posterior"
       ]
     };
   }
+
+  return {
+    whatToSay: [
+      "I am exercising my right to remain silent.",
+      "Am I free to go?",
+      "I do not consent to any searches.",
+      "I would like to speak with a lawyer."
+    ],
+    whatNotToSay: [
+      "Don't argue or become confrontational",
+      "Don't lie or provide false information",
+      "Don't resist physically",
+      "Don't consent to searches"
+    ],
+    keyRights: [
+      "Right to remain silent",
+      "Right to refuse searches without a warrant",
+      "Right to ask if you're being detained",
+      "Right to legal representation"
+    ],
+    additionalTips: [
+      "Keep your hands visible at all times",
+      "Stay calm and speak respectfully",
+      "Remember details for later documentation"
+    ]
+  };
 }
